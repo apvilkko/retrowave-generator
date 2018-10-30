@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack -p",
-    "start": "webpack-dev-server --https"
+    "start": "webpack-dev-server --https",
+    "start:testbed": "APP_ENV=testbed webpack-dev-server --https"
   },
   "repository": {
     "type": "git",
@@ -27,5 +28,9 @@
     "webpack": "^4.23.1",
     "webpack-cli": "^3.1.2",
     "webpack-dev-server": "^3.1.10"
+  },
+  "dependencies": {
+    "@babel/polyfill": "^7.0.0",
+    "seedrandom": "^2.4.4"
   }
 }

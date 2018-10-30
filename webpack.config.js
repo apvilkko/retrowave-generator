@@ -1,9 +1,11 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
+const entry = process.env.APP_ENV === 'testbed' ? './src/testbed/index.js' : './src/index.js';
+
 module.exports = {
   mode: 'development',
-  entry: './src/testbed/index.js',
+  entry: ['@babel/polyfill', entry],
   output: {
     path: path.resolve(__dirname, './dist'),
   },

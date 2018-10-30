@@ -5,21 +5,24 @@ const create = ctx => {
   vcos.forEach(vco => vco.start());
 
   const vcas = [ctx.createGain(), ctx.createGain()];
-  const maxGain = 0.6;
+  const maxGain = 0.5;
 
   const output = ctx.createGain();
-  output.gain.value = 0.7;
+  output.gain.value = 0.6;
 
-  let fFrequency = 200;
+  let fFrequency = 100;
   const filter = ctx.createBiquadFilter();
   filter.type = 'lowpass';
-  filter.Q.value = 5;
+  filter.Q.value = 3;
   filter.frequency.value = fFrequency;
   filter.connect(output);
 
   let fEnvAttack = 0.05;
-  let fEnvAmount = 4000;
-  let fEnvRelease = 0.5;
+  let fEnvAmount = 1200;
+  let fEnvRelease = 0.1;
+
+  let aAttack = 0.003;
+  let aRelease = 0.050;
 
   vcas.forEach(vca => {
     vca.gain.value = 0;
@@ -32,11 +35,11 @@ const create = ctx => {
 
   const noteOn = (freq, atTime) => {
     const time = atTime || ctx.currentTime;
-    console.log('noteOn');
+    // console.log('noteOn', time);
     vcos.forEach(vco => vco.setFreq(freq));
     vcas.forEach(vca => {
       vca.gain.cancelScheduledValues(time);
-      vca.gain.linearRampToValueAtTime(maxGain, time + 0.100);
+      vca.gain.linearRampToValueAtTime(maxGain, time + aAttack);
     });
     filter.frequency.cancelScheduledValues(time);
     filter.frequency.setValueAtTime(fFrequency, time);
@@ -46,10 +49,10 @@ const create = ctx => {
 
   const noteOff = atTime => {
     const time = atTime || ctx.currentTime;
-    console.log('noteOff');
+    // console.log('noteOff', time);
     vcas.forEach(vca => {
       vca.gain.cancelScheduledValues(time);
-      vca.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.100);
+      vca.gain.linearRampToValueAtTime(0, time + aRelease);
     });
   };
 
