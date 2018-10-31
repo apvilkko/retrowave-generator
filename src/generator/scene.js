@@ -4,12 +4,14 @@ import retrosynth from '../retrosynth';
 import setParams from '../audio-components/setParams';
 import sampler from '../audio-components/sampler';
 import compressor from '../audio-components/compressor';
+import reverb from '../audio-components/reverb';
 import catalog from './catalog';
 
 const ROOT_NOTE = 36;
+const {BASS, DRUMS} = instruments;
 
 const styles = {
-  [instruments.BASS]: [
+  [BASS]: [
     '16th', // single note 16ths
     // '16thOct', // like 16th but octave is changed
     // 'arp', // like 16th but variation in notes
@@ -20,21 +22,21 @@ const styles = {
 };
 
 const generators = {
-  [instruments.BASS]: style => function* bassGenerator(scene) {
+  [BASS]: style => function* bassGenerator(scene) {
     let currentNote = 0;
     currentNote = yield;
     while (true) {
       if (currentNote % 2 === 0) {
         currentNote = yield ({
           note: ROOT_NOTE + scene.rootNoteOffset,
-          velocity: scene.instruments[instruments.BASS].volume,
+          velocity: scene.instruments[BASS].volume,
         });
       }
       currentNote = yield ({note: 'OFF'});
     }
   },
-  [instruments.DRUMS]: style => function* drumsGenerator(scene) {
-    const children = CHILDREN[instruments.DRUMS]
+  [DRUMS]: style => function* drumsGenerator(scene) {
+    const children = CHILDREN[DRUMS]
       .map(child => generators[child](style)(scene));
     let currentNote = 0;
     currentNote = yield;
@@ -44,7 +46,7 @@ const generators = {
   },
   [instruments.BD]: style => function* bdGenerator(scene) {
     let currentNote = 0;
-    const spec = scene.instruments[instruments.DRUMS].specs[instruments.BD];
+    const spec = scene.instruments[DRUMS].specs[instruments.BD];
     currentNote = yield;
     while (true) {
       if (currentNote % 8 === 0) {
@@ -59,7 +61,7 @@ const generators = {
   },
   [instruments.SN]: style => function* bdGenerator(scene) {
     let currentNote = 0;
-    const spec = scene.instruments[instruments.DRUMS].specs[instruments.SN];
+    const spec = scene.instruments[DRUMS].specs[instruments.SN];
     currentNote = yield;
     while (true) {
       if (currentNote % 16 === 8) {
@@ -74,7 +76,7 @@ const generators = {
   },
   [instruments.HC]: style => function* bdGenerator(scene) {
     let currentNote = 0;
-    const spec = scene.instruments[instruments.DRUMS].specs[instruments.HC];
+    const spec = scene.instruments[DRUMS].specs[instruments.HC];
     currentNote = yield;
     while (true) {
       if (currentNote % 2 === 0) {
@@ -89,19 +91,21 @@ const generators = {
   }
 };
 
+const getChoices = max => Array.from({length: max}, (_, i) => i + 1);
+
 const randomizers = {
-  [instruments.BASS]: () => {
-    const style = sample(styles[instruments.BASS]);
+  [BASS]: () => {
+    const style = sample(styles[BASS]);
     return {
       style,
       volume: 0.4,
     };
   },
-  [instruments.DRUMS]: () => {
+  [DRUMS]: () => {
     const specs = {};
-    CHILDREN[instruments.DRUMS].forEach(child => {
-      const max = catalog.samples[child]
-      const choices = Array.from({length: max}, (_, i) => i + 1);
+    CHILDREN[DRUMS].forEach(child => {
+      const max = catalog.samples[child];
+      const choices = getChoices(max);
       specs[child] = {
         sample: sample(choices),
         volume: 0.6,
@@ -111,13 +115,18 @@ const randomizers = {
     specs[instruments.HC].volume = randFloat(0.1, 0.2);
     specs[instruments.BD].volume = randFloat(0.95, 1.05);
     specs[instruments.SN].volume = randFloat(0.95, 1.05);
-    return {specs};
+    const reverbImpulse = sample(getChoices(catalog.samples.impulse));
+    return {
+      specs,
+      reverbImpulse,
+      volume: 0.8,
+    };
   },
 };
 
 const createInstrumentInstance = (context, instrument, specs) => {
   switch (instrument) {
-    case instruments.BASS:
+    case BASS:
       {
         const synth = retrosynth(context.mixer.ctx);
         setParams(synth)({
@@ -132,10 +141,10 @@ const createInstrumentInstance = (context, instrument, specs) => {
         })
         return synth;
       }
-    case instruments.DRUMS:
+    case DRUMS:
       {
         const children = {};
-        CHILDREN[instruments.DRUMS].forEach(child => {
+        CHILDREN[DRUMS].forEach(child => {
           children[child] = createInstrumentInstance(context, child, specs);
         });
         return {children};
@@ -172,23 +181,30 @@ const randomize = context => {
     // TODO disconnect old before creating new
     const track = context.mixer.tracks[instrument];
     const inserts = [];
-    if (instrument === instruments.DRUMS) {
+    if (instrument === DRUMS) {
+      const impulse = `impulse${scene.instruments[DRUMS].reverbImpulse}`;
+      inserts.push(reverb(context.mixer.ctx, {
+        impulse,
+        dry: 1,
+        wet: 0.15,
+      }));
       inserts.push(compressor(context.mixer.ctx, {
-        threshold: -8, ratio: 4, attack: 0.004, release: 0.040
+        threshold: -10, ratio: 4, attack: 0.004, release: 0.100
       }));
     }
-    if (inserts.length) {
-      inserts[inserts.length - 1].output.connect(track.gain);
+    for (let i = 0; i < inserts.length; ++i) {
+      inserts[i].output.connect((i < inserts.length - 1) ? inserts[i+1].input : track.gain);
     }
     const instance = scene.instances[instrument];
+    const dest = inserts.length ? inserts[0].input : track.gain;
     if (instance.output) {
-      const input = inserts.length ? inserts[0].input : track.gain;
-      instance.output.connect(input);
+      instance.output.connect(dest);
     }
     if (instance.children) {
       Object.values(instance.children).forEach(child => {
-        child.output.connect(track.gain)
+        child.output.connect(dest)
       });
+      track.gain.gain.value = scene.instruments[instrument].volume;
     }
     track.gain.connect(context.mixer.input);
   });

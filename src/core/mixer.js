@@ -17,7 +17,7 @@ const create = () => {
   const tracks = {};
   all.forEach(instrument => {
     const gain = ctx.createGain();
-    gain.value = 0.7;
+    gain.gain.value = 0.7;
     tracks[instrument] = {
       gain,
     };
