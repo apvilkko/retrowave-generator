@@ -39,12 +39,12 @@ const create = ctx => {
     const time = atTime || ctx.currentTime;
     // console.log('noteOn', time, time + aAttack);
     vcos.forEach(vco => {
-      const freq = noteToFreq(note, vco.detune);
+      const freq = noteToFreq(note.note, vco.detune);
       vco.setFreq(freq, atTime);
     });
     vcas.forEach(vca => {
       ads(vca.gain, time,
-        0, maxGain, aAttack, aDecay, aSustain);
+        0, maxGain * note.velocity, aAttack, aDecay, aSustain);
     });
     ads(filter.frequency, time,
       fFrequency, fFrequency + fEnvAmount, fEnvAttack, fEnvRelease, fFrequency);

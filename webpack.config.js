@@ -24,5 +24,9 @@ module.exports = {
       }
     ]
   },
-  plugins: [new HtmlWebpackPlugin()]
+  devtool: 'source-map',
+  plugins: [new HtmlWebpackPlugin()],
+  devServer: {
+    contentBase: path.resolve('./public')
+  }
 }

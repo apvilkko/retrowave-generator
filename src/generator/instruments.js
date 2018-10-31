@@ -1,7 +1,19 @@
 const BASS = 'BS';
 
-export const all = [BASS];
+const DRUMS = 'DR';
+const BD = 'BD';
+const SN = 'SN';
+const HC = 'HC'
+
+export const all = [BASS, DRUMS];
+export const CHILDREN = {
+  [DRUMS]: [BD, SN, HC]
+};
 
 export default {
-  BASS
+  BASS,
+  DRUMS,
+  BD,
+  SN,
+  HC,
 };
