@@ -1,5 +1,8 @@
 {
   "env": {"es6": true, "browser": true, "node": true},
   "extends": "eslint:recommended",
-  "parserOptions": {"ecmaVersion": 6, "sourceType": "module"}
+  "parserOptions": {"ecmaVersion": 6, "sourceType": "module"},
+  "rules": {
+    "no-cond-assign": 0
+  }
 }

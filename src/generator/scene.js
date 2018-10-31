@@ -1,6 +1,7 @@
 import instruments, {all} from './instruments';
 import {sample, rand} from '../utils';
 import retrosynth from '../retrosynth';
+import setParams from '../audio-components/setParams';
 
 const styles = {
   [instruments.BASS]: [
@@ -16,9 +17,10 @@ const styles = {
 const generators = {
   [instruments.BASS]: style => function* bassGenerator() {
     let currentNote = 0;
+    currentNote = yield;
     while (true) {
       if (currentNote % 2 === 0) {
-        currentNote = yield ({note: 'C-2'});
+        currentNote = yield ({note: 32});
       }
       currentNote = yield ({note: 'OFF'});
     }
@@ -39,8 +41,16 @@ const createInstrumentInstance = (context, instrument, specs) => {
     case instruments.BASS:
       {
         const synth = retrosynth(context.mixer.ctx);
-        synth.setParam('osctype0', 'sawtooth');
-        synth.setParam('osctype1', 'sawtooth');
+        setParams(synth)({
+          oscType0: 'sawtooth',
+          oscOn0: true,
+          oscOn1: false,
+          filterFreq: 800,
+          filterQ: 1,
+          aEnvAttack: 0.005,
+          aEnvRelease: 0.2,
+          aEnvDecay: 0.2,
+        })
         return synth;
       }
     default:

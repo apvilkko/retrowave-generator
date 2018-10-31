@@ -1,9 +1,9 @@
 import createVco from './vco';
+import {noteToFreq} from '../core/math';
+import {ads, r} from '../audio-components/envelope';
 
 const create = ctx => {
   const vcos = [createVco(ctx), createVco(ctx)];
-  vcos.forEach(vco => vco.start());
-
   const vcas = [ctx.createGain(), ctx.createGain()];
   const maxGain = 0.5;
 
@@ -22,6 +22,8 @@ const create = ctx => {
   let fEnvRelease = 0.1;
 
   let aAttack = 0.003;
+  let aDecay = 0.020;
+  let aSustain = maxGain;
   let aRelease = 0.050;
 
   vcas.forEach(vca => {
@@ -33,36 +35,51 @@ const create = ctx => {
     vcos[i].output.connect(vcas[i]);
   }
 
-  const noteOn = (freq, atTime) => {
+  const noteOn = (note, atTime) => {
     const time = atTime || ctx.currentTime;
-    // console.log('noteOn', time);
-    vcos.forEach(vco => vco.setFreq(freq));
-    vcas.forEach(vca => {
-      vca.gain.cancelScheduledValues(time);
-      vca.gain.linearRampToValueAtTime(maxGain, time + aAttack);
+    // console.log('noteOn', time, time + aAttack);
+    vcos.forEach(vco => {
+      const freq = noteToFreq(note, vco.detune);
+      vco.setFreq(freq, atTime);
     });
-    filter.frequency.cancelScheduledValues(time);
-    filter.frequency.setValueAtTime(fFrequency, time);
-    filter.frequency.linearRampToValueAtTime(fFrequency + fEnvAmount, time + fEnvAttack);
-    filter.frequency.linearRampToValueAtTime(fFrequency, time + fEnvAttack + fEnvRelease);
+    vcas.forEach(vca => {
+      ads(vca.gain, time,
+        0, maxGain, aAttack, aDecay, aSustain);
+    });
+    ads(filter.frequency, time,
+      fFrequency, fFrequency + fEnvAmount, fEnvAttack, fEnvRelease, fFrequency);
   };
 
   const noteOff = atTime => {
     const time = atTime || ctx.currentTime;
-    // console.log('noteOff', time);
+    // console.log('noteOff', time, time + aRelease);
     vcas.forEach(vca => {
-      vca.gain.cancelScheduledValues(time);
-      vca.gain.linearRampToValueAtTime(0, time + aRelease);
+      r(vca.gain, time, aRelease);
     });
   };
 
-  const setParam = (param, value) => {
+  const paramHandlers = {
+    filterFreq: (value, time) => {
+      fFrequency = value;
+      filter.frequency.setValueAtTime(value, time)
+    },
+    filterQ: (value, time) => filter.Q.setValueAtTime(value, time),
+    aEnvAttack: value => {aAttack = value},
+    aEnvDecay: value => {aDecay = value},
+    aEnvRelease: value => {aRelease = value},
+  };
+
+  const setParam = (param, value, atTime) => {
+    const time = atTime || ctx.currentTime;
     let match;
-    if (match = param.match(/detune(\d)/)) {
+    if (paramHandlers[param]) {
+      paramHandlers[param](value, time);
+    } else if (match = param.match(/detune(\d)/)) {
       vcos[match[1]].setDetune(value);
-    }
-    if (match = param.match(/osctype(\d)/)) {
+    } else if (match = param.match(/oscType(\d)/)) {
       vcos[match[1]].setOscType(value);
+    } else if (match = param.match(/oscOn(\d)/)) {
+      vcos[match[1]][value ? 'start' : 'stop']();
     }
   };
 

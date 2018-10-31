@@ -19,7 +19,7 @@ const scheduleNote = (context, when) => {
       if (event.note === 'OFF') {
         context.scene.instances[i].noteOff(when);
       } else {
-        context.scene.instances[i].noteOn(/* event.note */ 110, when);
+        context.scene.instances[i].noteOn(event.note, when);
       }
     }
   });

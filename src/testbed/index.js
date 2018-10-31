@@ -1,7 +1,8 @@
 import createMixer from '../core/mixer';
 import retroSynth from '../retrosynth';
 import loop from '../core/loop';
-import processAnalyserFrame, {OSC_WIDTH, OSC_HEIGHT} from '../visualization/processAnalyserFrame';
+import processAnalyserFrame from '../visualization/processAnalyserFrame';
+import createAnalyserCanvas from '../visualization/createAnalyserCanvas';
 
 let synth;
 let start = null;
@@ -36,15 +37,9 @@ const frame = timestamp => {
 const setupView = () => {
   const root = document.createElement('div');
   document.body.appendChild(root);
-  const canvas = document.createElement('canvas');
-  root.appendChild(canvas);
-
-  canvas.width = OSC_WIDTH;
-  canvas.height = OSC_HEIGHT;
-
+  createAnalyserCanvas(context, root);
   const mixer = createMixer();
   context.mixer = mixer;
-  context.drawContext = canvas.getContext('2d');
   loop(context);
 
   if (PLAY_TEST) {

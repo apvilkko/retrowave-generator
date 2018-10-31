@@ -1,5 +1,4 @@
-export const OSC_WIDTH = 640;
-export const OSC_HEIGHT = 240;
+import {OSC_WIDTH, OSC_HEIGHT} from './constants';
 
 export default context => () => {
   const {mixer, drawContext} = context;
