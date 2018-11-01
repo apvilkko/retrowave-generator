@@ -10,12 +10,19 @@ const create = ctx => {
   const output = ctx.createGain();
   output.gain.value = 0.6;
 
+  const eq = ctx.createBiquadFilter();
+  eq.type = 'peaking';
+  eq.Q.value = 1;
+  eq.frequency.value = 100;
+  eq.gain.value = 0;
+  eq.connect(output);
+
   let fFrequency = 100;
   const filter = ctx.createBiquadFilter();
   filter.type = 'lowpass';
   filter.Q.value = 3;
   filter.frequency.value = fFrequency;
-  filter.connect(output);
+  filter.connect(eq);
 
   let fEnvAttack = 0.05;
   let fEnvAmount = 1200;
@@ -67,6 +74,10 @@ const create = ctx => {
     aEnvAttack: value => {aAttack = value},
     aEnvDecay: value => {aDecay = value},
     aEnvRelease: value => {aRelease = value},
+    eqFrequency: value => { eq.frequency.value = value; },
+    eqGain: value => { eq.gain.value = value; },
+    eqType: value => { eq.type = value; },
+    eqQ: value => { eq.Q.value = value; },
   };
 
   const setParam = (param, value, atTime) => {

@@ -1,5 +1,6 @@
 import {all} from '../generator/instruments';
 import compressor from '../audio-components/compressor';
+import waveshaper from '../audio-components/waveshaper';
 
 const create = () => {
   const ctx = new (window.AudioContext || window.webkitAudioContext);
@@ -10,8 +11,11 @@ const create = () => {
   const masterLimiter = compressor(ctx, {ratio: 20.0, knee: 0});
   masterLimiter.output.connect(analyser);
 
+  const shaper = waveshaper(ctx);
+  shaper.output.connect(masterLimiter.input);
+
   const masterGain = ctx.createGain();
-  masterGain.connect(masterLimiter.input);
+  masterGain.connect(shaper.input);
   masterGain.gain.value = 0.7;
 
   const tracks = {};

@@ -1,16 +1,22 @@
 import {getRateFromPitch} from '../core/math';
 import loadBuffer from './loadBuffer';
 
-const create = (ctx, sampleName) => {
+const create = (ctx, sampleName, inserts) => {
   let bufferSource;
   let buffer = null;
   loadBuffer(ctx, sampleName).then(ret => {
     buffer = ret;
   });
-  const gain = ctx.createGain();
+  const output = ctx.createGain();
   const vca = ctx.createGain();
-  vca.connect(gain);
-  const output = gain;
+  if (!inserts || inserts.length === 0) {
+    vca.connect(output);
+  } else {
+    vca.connect(inserts[0].input);
+    for (let i = 0; i < inserts.length; ++i) {
+      inserts[i].output.connect((i < inserts.length - 1) ? inserts[i+1].input : output);
+    }
+  }
 
   const noteOn = (note, atTime) => {
     const pitch = note.note;
@@ -36,7 +42,7 @@ const create = (ctx, sampleName) => {
   }
 
   return {
-    gain,
+    gain: output,
     output,
 
     noteOn,

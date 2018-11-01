@@ -14,10 +14,10 @@ const {BASS, DRUMS, LEAD1} = instruments;
 const styles = {
   [BASS]: [
     '16th', // single note 16ths
-    // '16thOct', // like 16th but octave is changed
+    '16thOct', // like 16th but octave is changed
     // 'arp', // like 16th but variation in notes
-    // 'offbeat', // 8th on the offbeat only
-    // '8th', // single note 8ths
+    'offbeat', // 8th on the offbeat only
+    '8th', // single note 8ths
     // 'ifeellove', // note changes on 8th, 16ths
   ],
 };
@@ -40,51 +40,65 @@ const CHORD_PRESETS = [
   [-4, -2, 0, 0],
 ];
 
+const createArray = length => Array.from({length}, () => null);
+
+const createPatternGenerator = noteGetter => style => function* patternGenerator(scene) {
+  let currentNote = 0;
+  const patLength = fourBars;
+  const pattern = createArray(patLength);
+  while (true) {
+    let note;
+    const position = currentNote % patLength;
+    if (pattern[position] === null) {
+      note = noteGetter({currentNote, position, patLength, pattern, scene, style}) ||
+        {note: 'OFF'};
+      pattern[position] = note;
+    } else {
+      note = pattern[position];
+    }
+    currentNote = yield note;
+  }
+};
+
+const createDrumGenerator = (instrument, noteGetter) => style => function* drumGenerator(scene) {
+  let currentNote = 0;
+  const spec = scene.instruments[DRUMS].specs[instrument];
+  const common = {instrument, note: spec.pitch};
+  currentNote = yield;
+  while (true) {
+    currentNote = yield noteGetter({currentNote, spec, common, style});
+  }
+};
+
 const generators = {
-  [BASS]: style => function* bassGenerator(scene) {
-    let currentNote = 0;
-    const patLength = fourBars;
-    const pattern = Array.from({length: patLength}, () => null);
-    while (true) {
-      let note = {note: 'OFF'};
-      const position = currentNote % patLength;
-      if (pattern[position] === null) {
-        if (currentNote % sixteenth === 0) {
-          note = {
-            note: ROOT_NOTE + scene.rootNoteOffset +
-              scene.chords[Math.floor(position / bar) % scene.chords.length],
-            velocity: scene.instruments[BASS].volume,
-          };
+  [BASS]: createPatternGenerator(({currentNote, position, scene, style}) => {
+    if (style === '16th' || style === '8th' || style === '16thOct' || style === 'offbeat') {
+      const cycle = (style === '8th' ? eighth : (style === 'offbeat' ? quarter : sixteenth));
+      if (currentNote % cycle === (style === 'offbeat' ? eighth : 0)) {
+        let pitch = ROOT_NOTE + scene.rootNoteOffset +
+          scene.chords[Math.floor(position / bar) % scene.chords.length];
+        if (style === '16thOct') {
+          pitch += (currentNote % eighth === 0) ? 0 : 12;
         }
-        pattern[position] = note;
-      } else {
-        note = pattern[position];
-      }
-      currentNote = yield note;
-    }
-  },
-  [LEAD1]: style => function* bassGenerator(scene) {
-    let currentNote = 0;
-    const patLength = bar * 2;
-    const pattern = Array.from({length: patLength}, () => null);
-    while (true) {
-      let note = {note: 'OFF'};
-      if (pattern[currentNote % patLength] === null) {
-        if (currentNote % sixteenth === 0 && rand(1, 100) > 50) {
-          note = {
-            note: ROOT_NOTE + rand(1, 2) * octave + scene.rootNoteOffset +
-              randWeighted(AEOLIAN, WEIGHTS),
-            velocity: scene.instruments[LEAD1].volume,
-          };
+        let velocity = scene.instruments[BASS].volume;
+        if (style !== '8th' && (currentNote % quarter === 0)) {
+          velocity *= 0.7;
         }
-        pattern[currentNote % patLength] = note;
-      } else {
-        const index = currentNote % patLength;
-        note = pattern[index];
+        return {note: pitch, velocity};
       }
-      currentNote = yield note;
     }
-  },
+    return null;
+  }),
+  [LEAD1]: createPatternGenerator(({currentNote, scene}) => {
+    if (currentNote % sixteenth === 0 && rand(1, 100) > 60) {
+      return {
+        note: ROOT_NOTE + rand(1, 2) * octave + scene.rootNoteOffset +
+          randWeighted(AEOLIAN, WEIGHTS),
+        velocity: scene.instruments[LEAD1].volume,
+      };
+    }
+    return null;
+  }),
   [DRUMS]: style => function* drumsGenerator(scene) {
     const children = CHILDREN[DRUMS]
       .map(child => generators[child](style)(scene));
@@ -94,56 +108,32 @@ const generators = {
       currentNote = yield children.map(child => child.next(currentNote).value);
     }
   },
-  [instruments.BD]: style => function* bdGenerator(scene) {
-    let currentNote = 0;
-    const spec = scene.instruments[DRUMS].specs[instruments.BD];
-    const common = {instrument: instruments.BD, note: spec.pitch};
-    currentNote = yield;
-    while (true) {
-      if (currentNote % quarter === 0) {
-        currentNote = yield ({
-          ...common,
-          velocity: spec.volume,
-        });
-      } else if ((currentNote + eighth) % fourBars === 0) {
-        currentNote = yield ({
-          ...common,
-          velocity: spec.volume * 0.8,
-        });
-      }
-      currentNote = yield;
+  [instruments.BD]: createDrumGenerator(instruments.BD, ({currentNote, spec, common}) => {
+    if (currentNote % quarter === 0) {
+      return {...common, velocity: spec.volume};
+    } else if ((currentNote + eighth) % fourBars === 0) {
+      return {...common, velocity: spec.volume * 0.8};
     }
-  },
-  [instruments.SN]: style => function* bdGenerator(scene) {
-    let currentNote = 0;
-    const spec = scene.instruments[DRUMS].specs[instruments.SN];
-    currentNote = yield;
-    while (true) {
-      if (currentNote % (2*quarter) === 8) {
-        currentNote = yield ({
-          note: spec.pitch,
-          velocity: spec.volume,
-          instrument: instruments.SN
-        });
-      }
-      currentNote = yield;
+    return null;
+  }),
+  [instruments.SN]: createDrumGenerator(instruments.SN, ({currentNote, spec, common}) => {
+    if (currentNote % (2 * quarter) === 8) {
+      return {...common, velocity: spec.volume};
     }
-  },
-  [instruments.HC]: style => function* bdGenerator(scene) {
-    let currentNote = 0;
-    const spec = scene.instruments[DRUMS].specs[instruments.HC];
-    currentNote = yield;
-    while (true) {
-      if (currentNote % sixteenth === 0) {
-        currentNote = yield ({
-          note: spec.pitch,
-          velocity: spec.volume,
-          instrument: instruments.HC,
-        });
-      }
-      currentNote = yield;
+    return null;
+  }),
+  [instruments.HC]: createDrumGenerator(instruments.HC, ({currentNote, spec, common}) => {
+    if (currentNote % sixteenth === 0) {
+      return {...common, velocity: spec.volume};
     }
-  }
+    return null;
+  }),
+  [instruments.TM]: createDrumGenerator(instruments.TM, ({currentNote, spec, common}) => {
+    if (currentNote % sixteenth === 0 && rand(1, 100) > 95) {
+      return {...common, note: common.note + rand(-6,6), velocity: spec.volume};
+    }
+    return null;
+  }),
 };
 
 const getChoices = max => Array.from({length: max}, (_, i) => i + 1);
@@ -151,14 +141,18 @@ const getChoices = max => Array.from({length: max}, (_, i) => i + 1);
 const randomizers = {
   [BASS]: () => {
     const style = sample(styles[BASS]);
+    const isEighth = style === 'offbeat' || style === '8th';
     return {
       style,
-      volume: 0.5,
+      volume: 0.55,
+      aEnvRelease: isEighth ? randFloat(0.3, 0.4) : randFloat(0.9, 0.14),
+      oscType: sample(['sawtooth', 'square']),
     };
   },
   [LEAD1]: () => {
     return {
       volume: 0.55,
+      oscType: sample(['sawtooth', 'square', 'triangle']),
     };
   },
   [DRUMS]: () => {
@@ -175,6 +169,7 @@ const randomizers = {
     specs[instruments.HC].volume = randFloat(0.1, 0.2);
     specs[instruments.BD].volume = randFloat(0.95, 1.05);
     specs[instruments.SN].volume = randFloat(0.95, 1.05);
+    specs[instruments.TM].volume = randFloat(0.4, 0.5);
     const reverbImpulse = sample(getChoices(catalog.samples.impulse));
     return {
       specs,
@@ -190,14 +185,17 @@ const createInstrumentInstance = (context, instrument, specs) => {
       {
         const synth = retrosynth(context.mixer.ctx);
         setParams(synth)({
-          oscType0: 'sawtooth',
+          oscType0: specs.oscType,
           oscOn0: true,
           oscOn1: false,
           filterFreq: 800,
           filterQ: 1,
           aEnvAttack: 0.005,
-          aEnvRelease: 0.1,
+          aEnvRelease: specs.aEnvRelease,
           aEnvDecay: 0.2,
+          eqFrequency: 100,
+          eqGain: 6,
+          eqQ: 2,
         })
         return synth;
       }
@@ -205,8 +203,8 @@ const createInstrumentInstance = (context, instrument, specs) => {
       {
         const synth = retrosynth(context.mixer.ctx);
         setParams(synth)({
-          oscType0: 'sawtooth',
-          oscType1: 'sawtooth',
+          oscType0: specs.oscType,
+          oscType1: specs.oscType,
           oscDetune0: randFloat(1, 10),
           oscDetune1: randFloat(-10, -1),
           oscOn0: true,
@@ -216,6 +214,9 @@ const createInstrumentInstance = (context, instrument, specs) => {
           aEnvAttack: 0.010,
           aEnvRelease: 0.1,
           aEnvDecay: 0.1,
+          eqFrequency: 250,
+          eqType: 'lowshelf',
+          eqGain: -6,
         });
         return synth;
       }
@@ -230,9 +231,20 @@ const createInstrumentInstance = (context, instrument, specs) => {
     case instruments.BD:
     case instruments.SN:
     case instruments.HC:
+    case instruments.TM:
       {
         const sampleName = `${instrument}${specs.specs[instrument].sample}`;
-        const synth = sampler(context.mixer.ctx, sampleName);
+        const inserts = (instrument === instruments.SN || instrument === instruments.TM) ? [
+          reverb(context.mixer.ctx, {
+            impulse: `impulse${specs.reverbImpulse}`,
+            dry: 1,
+            wet: 0.3,
+          }),
+          compressor(context.mixer.ctx, {
+            threshold: -15, ratio: 6, attack: 0.004, release: 0.180
+          })
+        ] : [];
+        const synth = sampler(context.mixer.ctx, sampleName, inserts);
         return synth;
       }
     default:
@@ -271,14 +283,8 @@ const randomize = context => {
       }));
     }
     if (instrument === DRUMS) {
-      const impulse = `impulse${scene.instruments[DRUMS].reverbImpulse}`;
-      inserts.push(reverb(context.mixer.ctx, {
-        impulse,
-        dry: 1,
-        wet: 0.15,
-      }));
       inserts.push(compressor(context.mixer.ctx, {
-        threshold: -10, ratio: 4, attack: 0.004, release: 0.100
+        threshold: -8, ratio: 4, attack: 0.010, release: 0.100
       }));
     }
     for (let i = 0; i < inserts.length; ++i) {
