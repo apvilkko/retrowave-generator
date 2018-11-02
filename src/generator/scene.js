@@ -38,19 +38,23 @@ const WEIGHTS = weights.map(x => x / wSum);
 const CHORD_PRESETS = [
   [0, 0, -2, -4],
   [-4, -2, 0, 0],
+  [0, 0, 5, 7],
+  [0, 0, -4, 7],
+  [-4, 5, 0, -2],
+  [0, 0, -4, 5],
 ];
 
 const createArray = length => Array.from({length}, () => null);
 
-const createPatternGenerator = noteGetter => style => function* patternGenerator(scene) {
+const createPatternGenerator = (patLength, pre, noteGetter) => style => function* patternGenerator(scene) {
   let currentNote = 0;
-  const patLength = fourBars;
   const pattern = createArray(patLength);
+  const data = pre({style, scene});
   while (true) {
     let note;
     const position = currentNote % patLength;
     if (pattern[position] === null) {
-      note = noteGetter({currentNote, position, patLength, pattern, scene, style}) ||
+      note = noteGetter({currentNote, position, patLength, pattern, scene, style, data}) ||
         {note: 'OFF'};
       pattern[position] = note;
     } else {
@@ -70,13 +74,52 @@ const createDrumGenerator = (instrument, noteGetter) => style => function* drumG
   }
 };
 
+const BASS_MOVEMENT_PRESETS = [
+  [0, 0, 0, 2],
+  [0, 0, -3, -1],
+  [0, 0, 3, 2],
+  [0, 0, 0, -1],
+];
+
+const mod = (n, m) => (((n % m) + m) % m);
+
 const generators = {
-  [BASS]: createPatternGenerator(({currentNote, position, scene, style}) => {
+  [BASS]: createPatternGenerator(fourBars, () => null, ({currentNote, position, scene, style}) => {
     if (style === '16th' || style === '8th' || style === '16thOct' || style === 'offbeat') {
+      const movement = scene.instruments[BASS].movement;
+      const movementSpeed = scene.instruments[BASS].movementSpeed;
       const cycle = (style === '8th' ? eighth : (style === 'offbeat' ? quarter : sixteenth));
       if (currentNote % cycle === (style === 'offbeat' ? eighth : 0)) {
-        let pitch = ROOT_NOTE + scene.rootNoteOffset +
-          scene.chords[Math.floor(position / bar) % scene.chords.length];
+        const root = ROOT_NOTE + scene.rootNoteOffset;
+        const currentChord = scene.chords[Math.floor(position / bar) % scene.chords.length];
+        let pitch = root + currentChord;
+        if (movement) {
+          const currentChordIndex = AEOLIAN.findIndex(x => mod(currentChord, 12) === x);
+          let indexDelta = movement[Math.floor(position / (movementSpeed/4)) % movement.length];
+          if (currentChordIndex === 5 && indexDelta === 3) {
+            // avoid sharp 4 on VI chord
+            indexDelta = 4;
+          }
+          if (currentChordIndex === 6 && indexDelta === -1) {
+            // avoid seventh flavor on VII chord
+            indexDelta = -2;
+          }
+          if (currentChordIndex === 5 && indexDelta === 2) {
+            // avoid third on VI chord
+            indexDelta = 0;
+          }
+          if (currentChordIndex === 6 && indexDelta === 2) {
+            // avoid third on VII chord
+            indexDelta = 3;
+          }
+          const pitchOffset = currentChordIndex + indexDelta;
+          const newChordTone = AEOLIAN[mod(pitchOffset, AEOLIAN.length)];
+          pitch = root + newChordTone;
+          // console.log(root, currentChord, currentChordIndex, indexDelta, pitchOffset, newChordTone, pitch);
+        }
+        if (pitch - ROOT_NOTE >= 8) {
+          pitch -= 12;
+        }
         if (style === '16thOct') {
           pitch += (currentNote % eighth === 0) ? 0 : 12;
         }
@@ -89,7 +132,7 @@ const generators = {
     }
     return null;
   }),
-  [LEAD1]: createPatternGenerator(({currentNote, scene}) => {
+  [LEAD1]: createPatternGenerator(2 * bar, () => null, ({currentNote, scene}) => {
     if (currentNote % sixteenth === 0 && rand(1, 100) > 60) {
       return {
         note: ROOT_NOTE + rand(1, 2) * octave + scene.rootNoteOffset +
@@ -142,8 +185,12 @@ const randomizers = {
   [BASS]: () => {
     const style = sample(styles[BASS]);
     const isEighth = style === 'offbeat' || style === '8th';
+    const movement = rand(0, 100) > 50 ? sample(BASS_MOVEMENT_PRESETS) : null;
+    const movementSpeed = sample([bar, bar / 2]);
     return {
       style,
+      movement,
+      movementSpeed,
       volume: 0.55,
       aEnvRelease: isEighth ? randFloat(0.3, 0.4) : randFloat(0.9, 0.14),
       oscType: sample(['sawtooth', 'square']),
