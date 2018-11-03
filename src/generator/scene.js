@@ -9,7 +9,7 @@ import stereoDelay from '../audio-components/stereoDelay';
 import catalog from './catalog';
 
 const ROOT_NOTE = 36;
-const {BASS, DRUMS, LEAD1} = instruments;
+const {BASS, DRUMS, LEAD1, BD, SN, HC, TM, PR} = instruments;
 
 const styles = {
   [BASS]: [
@@ -151,7 +151,7 @@ const generators = {
       currentNote = yield children.map(child => child.next(currentNote).value);
     }
   },
-  [instruments.BD]: createDrumGenerator(instruments.BD, ({currentNote, spec, common}) => {
+  [BD]: createDrumGenerator(BD, ({currentNote, spec, common}) => {
     if (currentNote % quarter === 0) {
       return {...common, velocity: spec.volume};
     } else if ((currentNote + eighth) % fourBars === 0) {
@@ -159,21 +159,27 @@ const generators = {
     }
     return null;
   }),
-  [instruments.SN]: createDrumGenerator(instruments.SN, ({currentNote, spec, common}) => {
+  [SN]: createDrumGenerator(SN, ({currentNote, spec, common}) => {
     if (currentNote % (2 * quarter) === 8) {
       return {...common, velocity: spec.volume};
     }
     return null;
   }),
-  [instruments.HC]: createDrumGenerator(instruments.HC, ({currentNote, spec, common}) => {
+  [HC]: createDrumGenerator(HC, ({currentNote, spec, common}) => {
     if (currentNote % sixteenth === 0) {
       return {...common, velocity: spec.volume};
     }
     return null;
   }),
-  [instruments.TM]: createDrumGenerator(instruments.TM, ({currentNote, spec, common}) => {
+  [TM]: createDrumGenerator(TM, ({currentNote, spec, common}) => {
     if (currentNote % sixteenth === 0 && rand(1, 100) > 95) {
       return {...common, note: common.note + rand(-6,6), velocity: spec.volume};
+    }
+    return null;
+  }),
+  [PR]: createDrumGenerator(PR, ({currentNote, spec, common}) => {
+    if (currentNote % sixteenth === 0 && rand(1, 100) > 95) {
+      return {...common, velocity: spec.volume * randFloat(0.5, 1.0)};
     }
     return null;
   }),
@@ -186,7 +192,7 @@ const randomizers = {
     const style = sample(styles[BASS]);
     const isEighth = style === 'offbeat' || style === '8th';
     const movement = rand(0, 100) > 50 ? sample(BASS_MOVEMENT_PRESETS) : null;
-    const movementSpeed = sample([bar, bar / 2]);
+    const movementSpeed = style === 'offbeat' ? bar : sample([bar, bar / 2]);
     return {
       style,
       movement,
@@ -213,10 +219,10 @@ const randomizers = {
         pitch: randFloat(-3, 3)
       };
     });
-    specs[instruments.HC].volume = randFloat(0.1, 0.2);
-    specs[instruments.BD].volume = randFloat(0.95, 1.05);
-    specs[instruments.SN].volume = randFloat(0.95, 1.05);
-    specs[instruments.TM].volume = randFloat(0.4, 0.5);
+    specs[HC].volume = randFloat(0.1, 0.2);
+    specs[BD].volume = randFloat(0.95, 1.05);
+    specs[SN].volume = randFloat(0.95, 1.05);
+    specs[TM].volume = randFloat(0.4, 0.5);
     const reverbImpulse = sample(getChoices(catalog.samples.impulse));
     return {
       specs,
@@ -275,22 +281,28 @@ const createInstrumentInstance = (context, instrument, specs) => {
         });
         return {children};
       }
-    case instruments.BD:
-    case instruments.SN:
-    case instruments.HC:
-    case instruments.TM:
+    case BD:
+    case SN:
+    case HC:
+    case TM:
+    case PR:
       {
         const sampleName = `${instrument}${specs.specs[instrument].sample}`;
-        const inserts = (instrument === instruments.SN || instrument === instruments.TM) ? [
-          reverb(context.mixer.ctx, {
+        const shouldComp = (instrument === SN || instrument === TM);
+        const shouldRev = (instrument === SN || instrument === TM || instrument === PR);
+        const inserts = [];
+        if (shouldRev) {
+          inserts.push(reverb(context.mixer.ctx, {
             impulse: `impulse${specs.reverbImpulse}`,
             dry: 1,
             wet: 0.3,
-          }),
-          compressor(context.mixer.ctx, {
+          }));
+        }
+        if (shouldComp) {
+          inserts.push(compressor(context.mixer.ctx, {
             threshold: -15, ratio: 6, attack: 0.004, release: 0.180
-          })
-        ] : [];
+          }));
+        }
         const synth = sampler(context.mixer.ctx, sampleName, inserts);
         return synth;
       }

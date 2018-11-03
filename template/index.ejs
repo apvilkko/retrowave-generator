@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
+    <meta name="description" content="Randomized music generator in the style of synthwave/retrowave/outrun.">
+    <meta name="theme-color" content="#000000">
+    <title><%= htmlWebpackPlugin.options.title %></title>
+  </head>
+  <body>
+    <h1>
+      <span class="first">Jane 8's</span>
+      <span class="second">Retrowave</span>
+      <span class="third">Generator</span>
+    </h1>
+    <div id="app"></div>
+    <% for (var css in htmlWebpackPlugin.files.css) { %><link href="<%= htmlWebpackPlugin.files.css[css] %>" rel="stylesheet"><% } %>
+    <% for (var chunk in htmlWebpackPlugin.files.chunks) { %><script src="<%= htmlWebpackPlugin.files.chunks[chunk].entry %>"></script><% } %>
+    <footer>
+      Runs best on Chrome.
+      Code at <a href="https://github.com/apvilkko/retrowave-generator">github</a>.
+    </footer>
+  </body>
+</html>

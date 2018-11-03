@@ -1,0 +1,108 @@
+$cyan: #03d2d8;
+$shadow-color: #f9fcfd;
+$pink: #fe07d4;
+$bright: #feffdd;
+$blue: #499dcb;
+$shine-gradient: -webkit-linear-gradient($blue, $bright, #1a1969, #e39cba, $bright);
+
+@import url('https://fonts.googleapis.com/css?family=Mr+Dafoe');
+
+@font-face {
+  font-family: 'good_timesregular';
+  src: url('../public/fonts/good_times_rg-webfont.woff2') format('woff2'),
+       url('../public/fonts/good_times_rg-webfont.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: black;
+  color: $cyan;
+
+  font-family: good_timesregular, sans-serif;
+  font-size: 22px;
+  text-align: center;
+}
+
+footer {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+  color: $blue;
+}
+
+a {
+  color: $blue;
+}
+
+h1 {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+
+  .first {
+    display: inline-block;
+    font-family: 'Mr Dafoe', cursive;
+    font-size: 3rem;
+    font-style: italic;
+    color: $pink;
+    text-shadow: 0px 1px 0px $shadow-color, 2px 2px 12px black;
+
+    transform: rotate(-13deg);
+    margin-bottom: -1rem;
+  }
+  .second {
+    display: inline-block;
+    font-size: 4rem;
+    background: $shine-gradient;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .third {
+    display: inline-block;
+    text-shadow: 0px 1px 0px $shadow-color, 0px 2px 5px rgba(255,255,255,0.8);
+  }
+}
+
+.grid {
+  margin-top: -12rem;
+  width: 100%;
+  overflow: hidden;
+}
+
+table {
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0;
+  border-collapse: collapse;
+
+  transform: perspective(300px) rotateX(60deg);
+  tr {
+    margin: 0;
+    padding: 0;
+  }
+  td {
+    margin: 0;
+    padding: 0;
+    width: 3rem;
+    height: 3rem;
+    border: 2px solid $pink;
+  }
+}
+
+.controls {
+  position: absolute;
+  top: 52%;
+  left: calc(50% - 2em);
+}
+
+button {
+  background: transparentize($pink, 0.8);
+  border: 2px solid $pink;
+  color: $pink;
+  padding: 0.5em 1em;
+  outline-color: $pink;
+}

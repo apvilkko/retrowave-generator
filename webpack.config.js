@@ -7,12 +7,25 @@ module.exports = {
   mode: 'development',
   entry: ['@babel/polyfill', entry],
   output: {
+    filename: 'bundle.[hash].js',
     path: path.resolve(__dirname, './dist'),
   },
   module: {
     rules: [
       {
-        test: /\.m?js$/,
+        test: /\.(woff2?|ttf|otf|eot|svg)$/,
+        exclude: /node_modules/,
+        loader: 'file-loader',
+        options: {
+          name: '[path][name].[ext]'
+        }
+      },
+      {
+        test: /\.scss$/,
+        use: ['style-loader', 'css-loader', 'sass-loader'],
+      },
+      {
+        test: /\.js$/,
         exclude: /(node_modules|bower_components)/,
         use: {
           loader: 'babel-loader',
@@ -24,7 +37,14 @@ module.exports = {
     ]
   },
   devtool: 'source-map',
-  plugins: [new HtmlWebpackPlugin()],
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: './template/index.ejs',
+      title: 'Jane 8\'s Retrowave Generator',
+      inject: false,
+      hash: true,
+    }),
+  ],
   devServer: {
     contentBase: path.resolve('./public')
   }
