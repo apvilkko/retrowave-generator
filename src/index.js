@@ -29,6 +29,7 @@ const setupAnalyser = root => {
 
 const createActions = context => ({
   play: () => { play(context.sequencer); },
+  randomize: () => { randomizeScene(); },
 });
 
 const setup = () => {

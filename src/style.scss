@@ -95,8 +95,8 @@ table {
 
 .controls {
   position: absolute;
-  top: 52%;
-  left: calc(50% - 2em);
+  top: 26rem;
+  left: calc(50% - 4.3em);
 }
 
 button {
@@ -105,4 +105,9 @@ button {
   color: $pink;
   padding: 0.5em 1em;
   outline-color: $pink;
+  cursor: pointer;
+}
+
+button + button {
+  margin-left: 0.2em;
 }

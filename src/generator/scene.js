@@ -22,7 +22,6 @@ const styles = {
   ],
 };
 
-
 const quarter = 8;
 const bar = quarter * 4;
 const fourBars = bar * 4;
@@ -313,7 +312,40 @@ const createInstrumentInstance = (context, instrument, specs) => {
   }
 };
 
+const cleanup = context => {
+  const scene = context.scene;
+  if (!scene) {
+    return;
+  }
+  all.forEach(instrument => {
+    const instance = scene.instances[instrument];
+    const track = context.mixer.tracks[instrument];
+    const inserts = instance.mixerInserts;
+    const sends = instance.mixerSends;
+    for (let i = 0; i < inserts.length; ++i) {
+      inserts[i].input.disconnect();
+      inserts[i].output.disconnect();
+      delete inserts[i];
+    }
+    for (let i = 0; i < sends.length; ++i) {
+      sends[i].input.disconnect();
+      sends[i].output.disconnect();
+      delete sends[i];
+    }
+    if (instance.output) {
+      instance.output.disconnect();
+    }
+    if (instance.children) {
+      Object.values(instance.children).forEach(child => {
+        child.output.disconnect();
+      });
+    }
+    track.gain.disconnect(context.mixer.input);
+  });
+};
+
 const randomize = context => {
+  cleanup(context);
   const scene = {
     tempo: rand(100, 125),
     instruments: {},
@@ -364,6 +396,8 @@ const randomize = context => {
       });
       track.gain.gain.value = scene.instruments[instrument].volume;
     }
+    instance.mixerInserts = inserts;
+    instance.mixerSends = sends;
     track.gain.connect(context.mixer.input);
   });
 

@@ -2,6 +2,8 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 const entry = process.env.APP_ENV === 'testbed' ? './src/testbed/index.js' : './src/index.js';
+const publicPath = process.env.NODE_ENV === 'production' ?
+  '/retrowave-generator/' : '/';
 
 module.exports = {
   mode: 'development',
@@ -9,6 +11,7 @@ module.exports = {
   output: {
     filename: 'bundle.[hash].js',
     path: path.resolve(__dirname, './dist'),
+    publicPath,
   },
   module: {
     rules: [
@@ -47,5 +50,5 @@ module.exports = {
   ],
   devServer: {
     contentBase: path.resolve('./public')
-  }
-}
+  },
+};
