@@ -7,10 +7,11 @@ const SN = 'SN';
 const HC = 'HC';
 const TM = 'TM';
 const PR = 'PR';
+const CP = 'CP';
 
 export const all = [BASS, DRUMS, LEAD1];
 export const CHILDREN = {
-  [DRUMS]: [BD, SN, HC, TM, PR]
+  [DRUMS]: [BD, SN, HC, TM, PR, CP]
 };
 
 export default {
@@ -21,5 +22,6 @@ export default {
   HC,
   TM,
   PR,
+  CP,
   LEAD1,
 };

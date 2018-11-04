@@ -5,8 +5,9 @@ export default {
     HC: 4,
     HO: 2,
     impulse: 3,
-    PR: 1,
+    PR: 6,
     RD: 1,
     TM: 4,
+    CP: 2,
   }
 }

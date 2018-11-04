@@ -20,10 +20,12 @@ const scheduleNote = (context, when) => {
       if (e && e.note) {
         const parent = context.scene.instances[i];
         const instance = hasChildren ? parent.children[e.instrument] : parent;
-        if (e.note === 'OFF') {
-          instance.noteOff(when);
-        } else {
-          instance.noteOn(e, when);
+        if (instance) {
+          if (e.note === 'OFF') {
+            instance.noteOff(when);
+          } else {
+            instance.noteOn(e, when);
+          }
         }
       }
     });

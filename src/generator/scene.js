@@ -9,18 +9,20 @@ import stereoDelay from '../audio-components/stereoDelay';
 import catalog from './catalog';
 
 const ROOT_NOTE = 36;
-const {BASS, DRUMS, LEAD1, BD, SN, HC, TM, PR} = instruments;
+const {BASS, DRUMS, LEAD1, BD, SN, HC, TM, PR, CP} = instruments;
 
-const styles = {
-  [BASS]: [
-    '16th', // single note 16ths
-    '16thOct', // like 16th but octave is changed
-    // 'arp', // like 16th but variation in notes
-    'offbeat', // 8th on the offbeat only
-    '8th', // single note 8ths
-    // 'ifeellove', // note changes on 8th, 16ths
-  ],
-};
+const styles = [
+  '16th', // single note 16ths
+  '16thOct', // like 16th but octave is changed
+  // 'arp', // like 16th but variation in notes
+  'offbeat', // 8th on the offbeat only
+  '8th', // single note 8ths
+  // 'ifeellove', // note changes on 8th, 16ths
+];
+
+const hihatStyles = [
+  '16th', '8th', 'three'
+];
 
 const quarter = 8;
 const bar = quarter * 4;
@@ -143,6 +145,7 @@ const generators = {
   }),
   [DRUMS]: style => function* drumsGenerator(scene) {
     const children = CHILDREN[DRUMS]
+      .filter(child => (scene.instruments[DRUMS].perc ? child !== CP : child !== PR))
       .map(child => generators[child](style)(scene));
     let currentNote = 0;
     currentNote = yield;
@@ -164,8 +167,21 @@ const generators = {
     }
     return null;
   }),
-  [HC]: createDrumGenerator(HC, ({currentNote, spec, common}) => {
-    if (currentNote % sixteenth === 0) {
+  [HC]: createPatternGenerator(quarter, ({scene}) => {
+    const leaveOut = rand(0, 3);
+    const choices = [0, 1, 2, 3].filter(x => x !== leaveOut);
+    const spec = scene.instruments[DRUMS].specs[HC];
+    const common = {instrument: HC, note: spec.pitch};
+    return {choices, spec, common};
+  }, ({currentNote, data: {spec, common, choices}}) => {
+    const condition = spec.style === '8th' ? (currentNote % eighth === 0) : (
+      spec.style === '16th' ? (currentNote % sixteenth === 0) : (
+        spec.style === 'three' ? (
+          choices.map(x => (currentNote % quarter === (x * sixteenth))).some(x => !!x)
+        ) : false
+      )
+    );
+    if (condition) {
       return {...common, velocity: spec.volume};
     }
     return null;
@@ -182,13 +198,19 @@ const generators = {
     }
     return null;
   }),
+  [CP]: createDrumGenerator(CP, ({currentNote, spec, common}) => {
+    if (currentNote % sixteenth === 0 && rand(1, 100) > 95) {
+      return {...common, velocity: spec.volume * randFloat(0.5, 1.0)};
+    }
+    return null;
+  }),
 };
 
 const getChoices = max => Array.from({length: max}, (_, i) => i + 1);
 
 const randomizers = {
   [BASS]: () => {
-    const style = sample(styles[BASS]);
+    const style = sample(styles);
     const isEighth = style === 'offbeat' || style === '8th';
     const movement = rand(0, 100) > 50 ? sample(BASS_MOVEMENT_PRESETS) : null;
     const movementSpeed = style === 'offbeat' ? bar : sample([bar, bar / 2]);
@@ -215,17 +237,22 @@ const randomizers = {
       specs[child] = {
         sample: sample(choices),
         volume: 0.6,
-        pitch: randFloat(-3, 3)
+        pitch: randFloat(-3, 3),
+        style: sample(hihatStyles),
       };
     });
     specs[HC].volume = randFloat(0.1, 0.2);
     specs[BD].volume = randFloat(0.95, 1.05);
     specs[SN].volume = randFloat(0.95, 1.05);
     specs[TM].volume = randFloat(0.4, 0.5);
+    specs[PR].volume = randFloat(0.5, 0.7);
+    specs[CP].volume = randFloat(0.6, 1);
+    specs[PR].pitch = randFloat(-5, 5);
     const reverbImpulse = sample(getChoices(catalog.samples.impulse));
     return {
       specs,
       reverbImpulse,
+      perc: rand(1, 100) > 33,
       volume: 0.8,
     };
   },
@@ -276,6 +303,9 @@ const createInstrumentInstance = (context, instrument, specs) => {
       {
         const children = {};
         CHILDREN[DRUMS].forEach(child => {
+          if (child === CP && specs.perc) {
+            return;
+          }
           children[child] = createInstrumentInstance(context, child, specs);
         });
         return {children};
@@ -285,16 +315,18 @@ const createInstrumentInstance = (context, instrument, specs) => {
     case HC:
     case TM:
     case PR:
+    case CP:
       {
         const sampleName = `${instrument}${specs.specs[instrument].sample}`;
-        const shouldComp = (instrument === SN || instrument === TM);
-        const shouldRev = (instrument === SN || instrument === TM || instrument === PR);
+        const shouldComp = [SN, TM, CP].indexOf(instrument) > -1;
+        const shouldRev = [SN, TM, PR, CP].indexOf(instrument) > -1;
+        const wetRev = [CP, PR].indexOf(instrument) > -1;
         const inserts = [];
         if (shouldRev) {
           inserts.push(reverb(context.mixer.ctx, {
             impulse: `impulse${specs.reverbImpulse}`,
             dry: 1,
-            wet: 0.3,
+            wet: wetRev ? randFloat(0.5, 0.7) : randFloat(0.3, 0.5),
           }));
         }
         if (shouldComp) {
@@ -360,14 +392,14 @@ const randomize = context => {
     scene.generators[instrument] = generators[instrument](style)(scene);
     scene.instances[instrument] = createInstrumentInstance(context, instrument,
       scene.instruments[instrument]);
-    // TODO disconnect old before creating new
     const track = context.mixer.tracks[instrument];
     const inserts = [];
     const sends = [];
     if (instrument == LEAD1) {
+      const beatLen = 60 / scene.tempo;
       sends.push(stereoDelay(context.mixer.ctx, {
-        delayL: 60 / scene.tempo / 2,
-        delayR: 60 / scene.tempo / 4 * 3,
+        delayL: beatLen / rand(2, 4) * randFloat(0.98, 1.02),
+        delayR: beatLen / rand(2, 4) * randFloat(0.98, 1.02),
         filterFrequency: 4000,
         gain: 0.25,
         feedback: 0.7,
@@ -392,7 +424,7 @@ const randomize = context => {
     }
     if (instance.children) {
       Object.values(instance.children).forEach(child => {
-        child.output.connect(dest)
+        child.output.connect(dest);
       });
       track.gain.gain.value = scene.instruments[instrument].volume;
     }
