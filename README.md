@@ -3,3 +3,10 @@
 https://aapee.kapsi.fi/retrowave-generator
 
 Continuing the long tradition of music generators, this aesthetically pleasing app generates music in the style of retrowave, synthwave or outrun, whatever you want to call it.
+
+## Changelog
+
+v0.2
+ - drums: add perc samples, breakbeat, hihat variation, random fills
+v0.1
+ - initial release

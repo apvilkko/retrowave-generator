@@ -20,9 +20,10 @@ const styles = [
   // 'ifeellove', // note changes on 8th, 16ths
 ];
 
-const hihatStyles = [
-  '16th', '8th', 'three'
-];
+const drumStyles = {
+  [BD]: ['4x4', 'breakbeat'],
+  [HC]: ['16th', '8th', 'three'],
+};
 
 const quarter = 8;
 const bar = quarter * 4;
@@ -70,8 +71,9 @@ const createDrumGenerator = (instrument, noteGetter) => style => function* drumG
   const spec = scene.instruments[DRUMS].specs[instrument];
   const common = {instrument, note: spec.pitch};
   currentNote = yield;
+  const state = {};
   while (true) {
-    currentNote = yield noteGetter({currentNote, spec, common, style});
+    currentNote = yield noteGetter({currentNote, spec, common, style, state});
   }
 };
 
@@ -83,6 +85,12 @@ const BASS_MOVEMENT_PRESETS = [
 ];
 
 const mod = (n, m) => (((n % m) + m) % m);
+
+const isLastOf = (small, large) => (currentNote, exact) => {
+  const modulo = currentNote % large;
+  const delta = large - small;
+  return exact ? modulo === delta : modulo >= delta;
+};
 
 const generators = {
   [BASS]: createPatternGenerator(fourBars, () => null, ({currentNote, position, scene, style}) => {
@@ -153,17 +161,65 @@ const generators = {
       currentNote = yield children.map(child => child.next(currentNote).value);
     }
   },
-  [BD]: createDrumGenerator(BD, ({currentNote, spec, common}) => {
-    if (currentNote % quarter === 0) {
-      return {...common, velocity: spec.volume};
-    } else if ((currentNote + eighth) % fourBars === 0) {
-      return {...common, velocity: spec.volume * 0.8};
+  [BD]: createDrumGenerator(BD, ({currentNote, spec, common, state}) => {
+    if (!state.inFill) {
+      const cycle = sample([fourBars, 2 * fourBars, 4 * fourBars]);
+      const fillLength = sample([quarter, 2 * quarter, bar, eighth]);
+      if (isLastOf(fillLength, cycle)(currentNote, true) && rand(1, 100) > 50) {
+        state.inFill = {fillLength, cycle};
+      }
+    }
+    if (state.inFill) {
+      const {fillLength, cycle} = state.inFill;
+      if (isLastOf(fillLength, cycle)(currentNote)) {
+        const prob = (fillLength === quarter || fillLength === eighth) ? 25 :
+          (fillLength === (2 * quarter) ? 50 : 80);
+        if (currentNote % sixteenth === 0 && rand(1, 100) > prob) {
+          return {...common, velocity: spec.volume * randFloat(0.3, 0.95)};
+        }
+      } else {
+        state.inFill = null;
+      }
+    }
+    if (!state.inFill) {
+      if (spec.style === '4x4') {
+        if (currentNote % quarter === 0) {
+          return {...common, velocity: spec.volume};
+        }
+      } else if (spec.style === 'breakbeat') {
+        if (currentNote % bar === 0) {
+          return {...common, velocity: spec.volume};
+        } else if (currentNote % sixteenth === 0 && rand(1, 100) > 90) {
+          return {...common, velocity: spec.volume * randFloat(0.7, 1)};
+        }
+      }
     }
     return null;
   }),
-  [SN]: createDrumGenerator(SN, ({currentNote, spec, common}) => {
-    if (currentNote % (2 * quarter) === 8) {
-      return {...common, velocity: spec.volume};
+  [SN]: createDrumGenerator(SN, ({currentNote, spec, common, state}) => {
+    if (!state.inFill) {
+      const cycle = sample([fourBars, 2 * fourBars, 4 * fourBars]);
+      const fillLength = sample([quarter, 2 * quarter, bar, eighth]);
+      if (isLastOf(fillLength, cycle)(currentNote, true) && rand(1, 100) > 50) {
+        state.inFill = {fillLength, cycle};
+      }
+    }
+    if (state.inFill) {
+      const {fillLength, cycle} = state.inFill;
+      if (isLastOf(fillLength, cycle)(currentNote)) {
+        const prob = (fillLength === quarter || fillLength === eighth) ? 25 :
+          (fillLength === (2 * quarter) ? 50 : 80);
+        if (currentNote % sixteenth === 0 && rand(1, 100) > prob) {
+          return {...common, velocity: spec.volume * randFloat(0.3, 0.95)};
+        }
+      } else {
+        state.inFill = null;
+      }
+    }
+    if (!state.inFill) {
+      if (currentNote % (2 * quarter) === 8) {
+        return {...common, velocity: spec.volume};
+      }
     }
     return null;
   }),
@@ -186,9 +242,46 @@ const generators = {
     }
     return null;
   }),
-  [TM]: createDrumGenerator(TM, ({currentNote, spec, common}) => {
-    if (currentNote % sixteenth === 0 && rand(1, 100) > 95) {
-      return {...common, note: common.note + rand(-6,6), velocity: spec.volume};
+  [TM]: createDrumGenerator(TM, ({currentNote, spec, common, state}) => {
+    if (!state.inFill) {
+      const cycle = sample([fourBars, 2 * fourBars, 4 * fourBars]);
+      const fillLength = sample([quarter, 2 * quarter, bar, eighth]);
+      if (isLastOf(fillLength, cycle)(currentNote, true) && rand(1, 100) > 50) {
+        state.inFill = {fillLength, cycle};
+      }
+    }
+    if (state.inFill) {
+      const {fillLength, cycle} = state.inFill;
+      if (isLastOf(fillLength, cycle)(currentNote)) {
+        const prob = (fillLength === quarter || fillLength === eighth) ? 25 :
+          (fillLength === (2 * quarter) ? 50 : 80);
+        const playedLast = state.prevFilled;
+        if (playedLast && rand(1, 100) > 25 && currentNote % sixteenth !== 0) {
+          // Get some 32nds in there
+          return {
+            ...common,
+            note: playedLast.note,
+            velocity: playedLast.velocity * randFloat(0.5, 0.9),
+          };
+        }
+        state.prevFilled = null;
+        if (currentNote % sixteenth === 0 && rand(1, 100) > prob) {
+          const thisNote = {
+            ...common,
+            note: common.note + rand(-6,6),
+            velocity: spec.volume * randFloat(0.3, 0.95)
+          };
+          state.prevFilled = thisNote;
+          return thisNote;
+        }
+      } else {
+        state.inFill = null;
+      }
+    }
+    if (!state.inFill) {
+      if (currentNote % sixteenth === 0 && rand(1, 100) > 96) {
+        return {...common, note: common.note + rand(-6,6), velocity: spec.volume};
+      }
     }
     return null;
   }),
@@ -238,7 +331,7 @@ const randomizers = {
         sample: sample(choices),
         volume: 0.6,
         pitch: randFloat(-3, 3),
-        style: sample(hihatStyles),
+        style: sample(drumStyles[child] || [null]),
       };
     });
     specs[HC].volume = randFloat(0.1, 0.2);
