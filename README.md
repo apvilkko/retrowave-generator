@@ -8,5 +8,6 @@ Continuing the long tradition of music generators, this aesthetically pleasing a
 
 v0.2
  - drums: add perc samples, breakbeat, hihat variation, random fills
+
 v0.1
  - initial release
