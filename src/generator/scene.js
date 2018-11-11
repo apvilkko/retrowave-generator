@@ -9,7 +9,7 @@ import stereoDelay from '../audio-components/stereoDelay';
 import catalog from './catalog';
 
 const ROOT_NOTE = 36;
-const {BASS, DRUMS, LEAD1, BD, SN, HC, TM, PR, CP} = instruments;
+const {BASS, DRUMS, LEAD1, BD, SN, HC, TM, PR, CP, ORCH} = instruments;
 
 const styles = [
   '16th', // single note 16ths
@@ -48,7 +48,7 @@ const CHORD_PRESETS = [
 
 const createArray = length => Array.from({length}, () => null);
 
-const createPatternGenerator = (patLength, pre, noteGetter) => style => function* patternGenerator(scene) {
+const createPatternGenerator = (patLength, pre, noteGetter, noOff) => style => function* patternGenerator(scene) {
   let currentNote = 0;
   const pattern = createArray(patLength);
   const data = pre({style, scene});
@@ -57,7 +57,7 @@ const createPatternGenerator = (patLength, pre, noteGetter) => style => function
     const position = currentNote % patLength;
     if (pattern[position] === null) {
       note = noteGetter({currentNote, position, patLength, pattern, scene, style, data}) ||
-        {note: 'OFF'};
+        (noOff ? {} : {note: 'OFF'});
       pattern[position] = note;
     } else {
       note = pattern[position];
@@ -297,6 +297,15 @@ const generators = {
     }
     return null;
   }),
+  [ORCH]: createPatternGenerator(4 * bar, () => null, ({currentNote, scene}) => {
+    if (currentNote % (4 * bar) === 0) {
+      return {
+        note: scene.rootNoteOffset,
+        velocity: 1.0,
+      };
+    }
+    return null;
+  }, true),
 };
 
 const getChoices = max => Array.from({length: max}, (_, i) => i + 1);
@@ -321,6 +330,12 @@ const randomizers = {
       volume: 0.55,
       oscType: sample(['sawtooth', 'square', 'triangle']),
     };
+  },
+  [ORCH]: () => {
+    const specs = {[ORCH]: {
+      sample: sample(getChoices(catalog.samples[ORCH])),
+    }};
+    return {specs, reverbImpulse: sample(getChoices(catalog.samples.impulse))};
   },
   [DRUMS]: () => {
     const specs = {};
@@ -409,10 +424,11 @@ const createInstrumentInstance = (context, instrument, specs) => {
     case TM:
     case PR:
     case CP:
+    case ORCH:
       {
         const sampleName = `${instrument}${specs.specs[instrument].sample}`;
         const shouldComp = [SN, TM, CP].indexOf(instrument) > -1;
-        const shouldRev = [SN, TM, PR, CP].indexOf(instrument) > -1;
+        const shouldRev = [SN, TM, PR, CP, ORCH].indexOf(instrument) > -1;
         const wetRev = [CP, PR].indexOf(instrument) > -1;
         const inserts = [];
         if (shouldRev) {

@@ -9,5 +9,6 @@ export default {
     RD: 1,
     TM: 4,
     CP: 2,
+    OR: 5,
   }
 }
