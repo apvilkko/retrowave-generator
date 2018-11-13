@@ -74,6 +74,7 @@ const create = ctx => {
     aEnvAttack: value => {aAttack = value},
     aEnvDecay: value => {aDecay = value},
     aEnvRelease: value => {aRelease = value},
+    fEnvRelease: value => {fEnvRelease = value},
     eqFrequency: value => { eq.frequency.value = value; },
     eqGain: value => { eq.gain.value = value; },
     eqType: value => { eq.type = value; },

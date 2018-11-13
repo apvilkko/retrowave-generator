@@ -1,5 +1,6 @@
 const BASS = 'BS';
 const LEAD1 = 'LEAD1';
+const LEAD2 = 'LEAD2';
 
 const DRUMS = 'DR';
 const BD = 'BD';
@@ -10,7 +11,7 @@ const PR = 'PR';
 const CP = 'CP';
 const ORCH = 'OR';
 
-export const all = [BASS, DRUMS, LEAD1, ORCH];
+export const all = [BASS, DRUMS, LEAD1, LEAD2, ORCH];
 export const CHILDREN = {
   [DRUMS]: [BD, SN, HC, TM, PR, CP]
 };
@@ -25,5 +26,6 @@ export default {
   PR,
   CP,
   LEAD1,
+  LEAD2,
   ORCH,
 };
