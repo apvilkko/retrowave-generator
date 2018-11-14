@@ -11,6 +11,9 @@ import catalog from './catalog';
 const ROOT_NOTE = 36;
 const {BASS, DRUMS, LEAD1, LEAD2, BD, SN, HC, TM, PR, CP, ORCH} = instruments;
 
+// const muted = {[BASS]: true, [LEAD1]: true, [LEAD2]: true};
+const muted = {};
+
 const styles = [
   '16th', // single note 16ths
   '16thOct', // like 16th but octave is changed
@@ -21,7 +24,7 @@ const styles = [
 ];
 
 const drumStyles = {
-  [BD]: ['4x4', 'breakbeat'],
+  [BD]: ['4x4', 'breakbeat', 'mixed'],
   [HC]: ['16th', '8th', 'three'],
 };
 
@@ -50,25 +53,31 @@ const getChoices = max => Array.from({length: max}, (_, i) => i + 1);
 
 const createArray = length => Array.from({length}, () => null);
 
-const createPatternGenerator = (patLength, pre, noteGetter, noOff) => style => function* patternGenerator(scene) {
-  let currentNote = 0;
-  const pattern = createArray(patLength);
-  const data = pre({style, scene});
-  while (true) {
-    let note;
-    const position = currentNote % patLength;
-    if (pattern[position] === null) {
-      note = noteGetter({currentNote, position, patLength, pattern, scene, style, data}) ||
-        (noOff ? {} : {note: 'OFF'});
-      pattern[position] = note;
-    } else {
-      note = pattern[position];
+const createPatternGenerator = (patLength, pre, noteGetter, noOff, update) => (style, scene) =>
+  function* patternGenerator() {
+    let currentNote = 0;
+    const pattern = createArray(patLength);
+    const data = pre({style, scene}) || {};
+    while (true) {
+      let note;
+      const position = currentNote % patLength;
+      if (update) {
+        update(data, currentNote);
+      }
+      if (pattern[position] === null || data.inFill) {
+        note = noteGetter({currentNote, position, patLength, pattern, scene, style, data}) ||
+          (noOff ? {} : {note: 'OFF'});
+        if (!data.inFill) {
+          pattern[position] = note;
+        }
+      } else {
+        note = pattern[position];
+      }
+      currentNote = yield note;
     }
-    currentNote = yield note;
-  }
-};
+  };
 
-const createDrumGenerator = (instrument, noteGetter) => style => function* drumGenerator(scene) {
+const createDrumGenerator = (instrument, noteGetter) => (style, scene) => function* drumGenerator() {
   let currentNote = 0;
   const spec = scene.instruments[DRUMS].specs[instrument];
   const common = {instrument, note: spec.pitch};
@@ -104,21 +113,21 @@ const randomizers = {
       style,
       movement,
       movementSpeed,
-      volume: 0.65,
+      volume: muted[BASS] ? 0.01 : 0.65,
       aEnvRelease: isEighth ? randFloat(0.3, 0.4) : randFloat(0.09, 0.2),
       oscType: sample(['sawtooth', 'square']),
     };
   },
   [LEAD1]: () => {
     return {
-      volume: 0.5,
+      volume: muted[LEAD1] ? 0.01 : 0.5,
       pan: randFloat(-0.75, -0.01),
       oscType: sample(['sawtooth', 'square', 'triangle']),
     };
   },
   [LEAD2]: () => {
     return {
-      volume: randFloat(0.4, 0.5),
+      volume: muted[LEAD2] ? 0.01 : randFloat(0.4, 0.5),
       pan: randFloat(0.01, 0.75),
       oscType: sample(['sawtooth', 'square', 'triangle', 'sine']),
     };
@@ -150,7 +159,7 @@ const randomizers = {
     specs[SN].volume = randFloat(0.95, 1.05);
     specs[TM].volume = randFloat(0.4, 0.5);
     specs[PR].volume = randFloat(0.5, 0.7);
-    specs[CP].volume = randFloat(0.6, 1);
+    specs[CP].volume = randFloat(0.6, 0.9);
     specs[PR].volume = randFloat(0.3, 0.6);
     specs[PR].pitch = randFloat(-5, 5);
     const reverbImpulse = sample(getChoices(catalog.samples.impulse));
@@ -162,6 +171,27 @@ const randomizers = {
     };
   },
 };
+
+const maybeStartFill = (state, currentNote) => {
+  if (!state.inFill) {
+    const cycle = sample([fourBars, 2 * fourBars, 4 * fourBars]);
+    const fillLength = sample([quarter, 2 * quarter, bar, eighth]);
+    if (isLastOf(fillLength, cycle)(currentNote, true) && rand(1, 100) > 50) {
+      state.inFill = {fillLength, cycle};
+    }
+  }
+};
+
+const performFill = (state, currentNote, creator) => {
+  if (state.inFill) {
+    const {fillLength, cycle} = state.inFill;
+    if (isLastOf(fillLength, cycle)(currentNote)) {
+      return creator(fillLength, currentNote, state.common);
+    } else {
+      state.inFill = null;
+    }
+  }
+}
 
 const generators = {
   [BASS]: createPatternGenerator(fourBars, () => null, ({currentNote, position, scene, style}) => {
@@ -232,51 +262,109 @@ const generators = {
     }
     return null;
   }),
-  [DRUMS]: style => function* drumsGenerator(scene) {
+  [DRUMS]: (style, scene) => function* drumsGenerator() {
     const children = CHILDREN[DRUMS]
       .filter(child => (scene.instruments[DRUMS].perc ? child !== CP : child !== PR))
-      .map(child => generators[child](style)(scene));
+      .map(child => generators[child](style, scene)());
     let currentNote = 0;
     currentNote = yield;
     while (true) {
       currentNote = yield children.map(child => child.next(currentNote).value);
     }
   },
-  [BD]: createDrumGenerator(BD, ({currentNote, spec, common, state}) => {
-    if (!state.inFill) {
-      const cycle = sample([fourBars, 2 * fourBars, 4 * fourBars]);
-      const fillLength = sample([quarter, 2 * quarter, bar, eighth]);
-      if (isLastOf(fillLength, cycle)(currentNote, true) && rand(1, 100) > 50) {
-        state.inFill = {fillLength, cycle};
+  [BD]: (style, scene) => {
+    const spec = scene.instruments[DRUMS].specs[BD];
+    const fillCreator = (fillLength, currentNote, common) => {
+      const prob = (fillLength === quarter || fillLength === eighth) ? 25 :
+        (fillLength === (2 * quarter) ? 50 : 80);
+      if (currentNote % sixteenth === 0 && rand(1, 100) > prob) {
+        return {...common, velocity: spec.volume * randFloat(0.3, 0.95)};
       }
-    }
-    if (state.inFill) {
-      const {fillLength, cycle} = state.inFill;
-      if (isLastOf(fillLength, cycle)(currentNote)) {
-        const prob = (fillLength === quarter || fillLength === eighth) ? 25 :
-          (fillLength === (2 * quarter) ? 50 : 80);
-        if (currentNote % sixteenth === 0 && rand(1, 100) > prob) {
-          return {...common, velocity: spec.volume * randFloat(0.3, 0.95)};
+    };
+    if (spec.style === 'mixed') {
+      const cycleLen = sample([2, 4]) * bar;
+      const syncopatePosition = rand(1, 100) > 50 ? 0 : (cycleLen / 2);
+      const pre = ({scene}) => {
+        const spec = scene.instruments[DRUMS].specs[BD];
+        const common = {instrument: BD, note: spec.pitch};
+        const syncLen = rand(3 * sixteenth, 6 * sixteenth);
+        return {spec, common, syncLen};
+      };
+      const update = (data, currentNote) => {
+        maybeStartFill(data, currentNote);
+      };
+      return createPatternGenerator(cycleLen, pre, ({currentNote, data}) => {
+        const {spec, common} = data;
+        const fill = performFill(data, currentNote, fillCreator);
+        if (fill) {
+          return fill;
         }
-      } else {
-        state.inFill = null;
-      }
-    }
-    if (!state.inFill) {
-      if (spec.style === '4x4') {
-        if (currentNote % quarter === 0) {
-          return {...common, velocity: spec.volume};
+        if (!data.inFill) {
+          const distance = Math.abs(currentNote % cycleLen - syncopatePosition);
+          const sync = distance < data.syncLen;
+          if (currentNote % quarter === 0) {
+            if (!sync) {
+              return {...common, velocity: spec.volume};
+            }
+          } else {
+            if (sync && currentNote % sixteenth === 0 && rand(1, 100) > 60) {
+              return {...common, velocity: spec.volume};
+            }
+          }
         }
-      } else if (spec.style === 'breakbeat') {
-        if (currentNote % bar === 0) {
-          return {...common, velocity: spec.volume};
-        } else if (currentNote % sixteenth === 0 && rand(1, 100) > 90) {
-          return {...common, velocity: spec.volume * randFloat(0.7, 1)};
+        return null;
+      }, true, update)(style, scene);
+    } else if (spec.style === 'breakbeat') {
+      const cycleLen = sample([1, 2]) * bar;
+      const pre = ({scene}) => {
+        const spec = scene.instruments[DRUMS].specs[BD];
+        const common = {instrument: BD, note: spec.pitch};
+        return {spec, common};
+      };
+      const update = (data, currentNote) => {
+        maybeStartFill(data, currentNote);
+      };
+      return createPatternGenerator(cycleLen, pre, ({currentNote, data}) => {
+        const {spec, common} = data;
+        const fill = performFill(data, currentNote, fillCreator);
+        if (fill) {
+          return fill;
         }
-      }
+        if (!data.inFill) {
+          if (currentNote % sixteenth === 0) {
+            if (currentNote % (2 * bar) === 0) {
+              return {...common, velocity: spec.volume};
+            } else if (currentNote % (2 * quarter) !== quarter && rand(1, 100) > 80) {
+              return {...common, velocity: spec.volume * randFloat(0.5, 0.99)};
+            }
+          }
+        }
+        return null;
+      }, true, update)(style, scene);
+    } else {
+      return createDrumGenerator(BD, ({currentNote, spec, common, state}) => {
+        maybeStartFill(state, currentNote);
+        const fill = performFill(state, currentNote, fillCreator);
+        if (fill) {
+          return fill;
+        }
+        if (!state.inFill) {
+          if (spec.style === '4x4') {
+            if (currentNote % quarter === 0) {
+              return {...common, velocity: spec.volume};
+            }
+          } else if (spec.style === 'breakbeat') {
+            if (currentNote % bar === 0) {
+              return {...common, velocity: spec.volume};
+            } else if (currentNote % sixteenth === 0 && rand(1, 100) > 90) {
+              return {...common, velocity: spec.volume * randFloat(0.7, 1)};
+            }
+          }
+        }
+        return null;
+      })(style, scene);
     }
-    return null;
-  }),
+  },
   [SN]: createDrumGenerator(SN, ({currentNote, spec, common, state}) => {
     if (!state.inFill) {
       const cycle = sample([fourBars, 2 * fourBars, 4 * fourBars]);
@@ -298,7 +386,7 @@ const generators = {
       }
     }
     if (!state.inFill) {
-      if (currentNote % (2 * quarter) === 8) {
+      if (currentNote % (2 * quarter) === quarter) {
         return {...common, velocity: spec.volume};
       }
     }
@@ -554,7 +642,7 @@ const randomize = context => {
   all.forEach(instrument => {
     scene.instruments[instrument] = randomizers[instrument]();
     const style = scene.instruments[instrument].style;
-    scene.generators[instrument] = generators[instrument](style)(scene);
+    scene.generators[instrument] = generators[instrument](style, scene)();
     scene.instances[instrument] = createInstrumentInstance(context, instrument,
       scene.instruments[instrument]);
     const track = context.mixer.tracks[instrument];
