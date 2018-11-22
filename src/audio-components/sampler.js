@@ -34,7 +34,7 @@ const create = (ctx, sampleName, inserts) => {
     vca.gain.setValueAtTime(note.velocity || 1, time);
   };
 
-  const noteOff = atTime => {
+  const noteOff = (note, atTime) => {
     const time = atTime || ctx.currentTime;
     if (bufferSource) {
       bufferSource.stop(time);

@@ -15,15 +15,21 @@ const scheduleNote = (context, when) => {
   const scene = context.scene;
   all.forEach(i => {
     const event = scene.generators[i].next(currentNote).value;
-    const hasChildren = Array.isArray(event);
+    let hasChildren = Array.isArray(event);
+    // console.log(hasChildren, event, i);
     (hasChildren ? event : [event]).forEach(e => {
-      if (e && e.note) {
+      if (e && (e.note || e.action)) {
         const parent = context.scene.instances[i];
+        hasChildren = hasChildren && parent.children && e.instrument &&
+          parent.children[e.instrument];
         const instance = hasChildren ? parent.children[e.instrument] : parent;
+        // console.log(instance, parent.children, e.instrument);
         if (instance) {
-          if (e.note === 'OFF') {
-            instance.noteOff(when);
-          } else {
+          if (e.action === 'OFF') {
+            if (instance.noteOff) {
+              instance.noteOff(e, when);
+            }
+          } else if (instance.noteOn) {
             instance.noteOn(e, when);
           }
         }

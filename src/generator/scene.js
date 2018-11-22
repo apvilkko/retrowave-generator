@@ -1,6 +1,7 @@
 import instruments, {all, CHILDREN} from './instruments';
 import {sample, rand, randFloat, randWeighted} from '../utils';
 import retrosynth from '../retrosynth';
+import polysynth from '../retrosynth/polysynth';
 import setParams from '../audio-components/setParams';
 import sampler from '../audio-components/sampler';
 import compressor from '../audio-components/compressor';
@@ -9,7 +10,7 @@ import stereoDelay from '../audio-components/stereoDelay';
 import catalog from './catalog';
 
 const ROOT_NOTE = 36;
-const {BASS, DRUMS, LEAD1, LEAD2, BD, SN, HC, TM, PR, CP, ORCH} = instruments;
+const {BASS, DRUMS, LEAD1, LEAD2, BD, SN, HC, TM, PR, CP, ORCH, PAD} = instruments;
 
 // const muted = {[BASS]: true, [LEAD1]: true, [LEAD2]: true};
 const muted = {};
@@ -66,7 +67,7 @@ const createPatternGenerator = (patLength, pre, noteGetter, noOff, update) => (s
       }
       if (pattern[position] === null || data.inFill) {
         note = noteGetter({currentNote, position, patLength, pattern, scene, style, data}) ||
-          (noOff ? {} : {note: 'OFF'});
+          (noOff ? {} : {action: 'OFF'});
         if (!data.inFill) {
           pattern[position] = note;
         }
@@ -130,6 +131,13 @@ const randomizers = {
       volume: muted[LEAD2] ? 0.01 : randFloat(0.4, 0.5),
       pan: randFloat(0.01, 0.75),
       oscType: sample(['sawtooth', 'square', 'triangle', 'sine']),
+    };
+  },
+  [PAD]: () => {
+    return {
+      volume: muted[PAD] ? 0.01 : randFloat(0.4, 0.5),
+      pan: randFloat(0.01, 0.75),
+      oscType: sample(['sawtooth', 'square', 'triangle']),
     };
   },
   [ORCH]: () => {
@@ -466,6 +474,20 @@ const generators = {
     }
     return null;
   }),
+  [PAD]: createPatternGenerator(2 * bar, () => null, ({currentNote, scene}) => {
+    if (currentNote % bar === 0) {
+      return [0, 2, 7].map(x => ({
+        note: ROOT_NOTE + 2 * octave + scene.rootNoteOffset + x,
+        velocity: scene.instruments[PAD].volume * randFloat(0.8, 1.0),
+      }));
+    } else if (currentNote % bar === (bar / 2)) {
+      return [0, 2, 7].map(x => ({
+        note: ROOT_NOTE + 2 * octave + scene.rootNoteOffset + x,
+        action: 'OFF',
+      }));
+    }
+    return null;
+  }),
   [ORCH]: createPatternGenerator(4 * bar, () => null, ({currentNote, position, scene}) => {
     const cycleLen = 4 * bar;
     const currentChord = scene.chords[Math.floor(position / bar) % scene.chords.length];
@@ -543,6 +565,28 @@ const createInstrumentInstance = (context, instrument, specs) => {
           aEnvAttack: 0.010,
           aEnvRelease: randFloat(0.05, 0.1),
           aEnvDecay: randFloat(0.05, 0.1),
+          eqFrequency: 300,
+          eqType: 'lowshelf',
+          eqGain: -6,
+        });
+        return synth;
+      }
+    case PAD:
+      {
+        const synth = polysynth(context.mixer.ctx);
+        setParams(synth)({
+          oscType0: specs.oscType,
+          oscType1: specs.oscType,
+          oscDetune0: randFloat(5, 12),
+          oscDetune1: randFloat(-12, -5),
+          oscOn0: true,
+          oscOn1: true,
+          filterFreq: rand(600, 1100),
+          filterQ: randFloat(0.5, 1.5),
+          fEnvRelease: randFloat(0.04, 0.09),
+          aEnvAttack: randFloat(0.1, 0.5),
+          aEnvRelease: randFloat(0.5, 1.0),
+          aEnvDecay: randFloat(0.1, 0.2),
           eqFrequency: 300,
           eqType: 'lowshelf',
           eqGain: -6,

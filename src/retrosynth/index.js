@@ -57,7 +57,7 @@ const create = ctx => {
       fFrequency, fFrequency + fEnvAmount, fEnvAttack, fEnvRelease, fFrequency);
   };
 
-  const noteOff = atTime => {
+  const noteOff = (note, atTime) => {
     const time = atTime || ctx.currentTime;
     // console.log('noteOff', time, time + aRelease);
     vcas.forEach(vca => {

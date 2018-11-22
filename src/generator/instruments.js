@@ -10,8 +10,9 @@ const TM = 'TM';
 const PR = 'PR';
 const CP = 'CP';
 const ORCH = 'OR';
+const PAD = 'PD';
 
-export const all = [BASS, DRUMS, LEAD1, LEAD2, ORCH];
+export const all = [BASS, DRUMS, LEAD1, LEAD2, ORCH, PAD];
 export const CHILDREN = {
   [DRUMS]: [BD, SN, HC, TM, PR, CP]
 };
@@ -28,4 +29,5 @@ export default {
   LEAD1,
   LEAD2,
   ORCH,
+  PAD,
 };
