@@ -1,6 +1,6 @@
-import createVco from './vco';
-import {noteToFreq} from '../core/math';
-import {ads, r} from '../audio-components/envelope';
+import createVco from "./vco";
+import { noteToFreq } from "../core/math";
+import { ads, r } from "../audio-components/envelope";
 
 const create = ctx => {
   const vcos = [createVco(ctx), createVco(ctx)];
@@ -11,7 +11,7 @@ const create = ctx => {
   output.gain.value = 0.6;
 
   const eq = ctx.createBiquadFilter();
-  eq.type = 'peaking';
+  eq.type = "peaking";
   eq.Q.value = 1;
   eq.frequency.value = 100;
   eq.gain.value = 0;
@@ -19,7 +19,7 @@ const create = ctx => {
 
   let fFrequency = 100;
   const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
+  filter.type = "lowpass";
   filter.Q.value = 3;
   filter.frequency.value = fFrequency;
   filter.connect(eq);
@@ -29,9 +29,9 @@ const create = ctx => {
   let fEnvRelease = 0.1;
 
   let aAttack = 0.003;
-  let aDecay = 0.020;
+  let aDecay = 0.02;
   let aSustain = maxGain;
-  let aRelease = 0.050;
+  let aRelease = 0.05;
 
   vcas.forEach(vca => {
     vca.gain.value = 0;
@@ -50,11 +50,25 @@ const create = ctx => {
       vco.setFreq(freq, atTime);
     });
     vcas.forEach(vca => {
-      ads(vca.gain, time,
-        0, maxGain * note.velocity, aAttack, aDecay, aSustain);
+      ads(
+        vca.gain,
+        time,
+        0,
+        maxGain * note.velocity,
+        aAttack,
+        aDecay,
+        aSustain
+      );
     });
-    ads(filter.frequency, time,
-      fFrequency, fFrequency + fEnvAmount, fEnvAttack, fEnvRelease, fFrequency);
+    ads(
+      filter.frequency,
+      time,
+      fFrequency,
+      fFrequency + fEnvAmount,
+      fEnvAttack,
+      fEnvRelease,
+      fFrequency
+    );
   };
 
   const noteOff = (note, atTime) => {
@@ -68,17 +82,33 @@ const create = ctx => {
   const paramHandlers = {
     filterFreq: (value, time) => {
       fFrequency = value;
-      filter.frequency.setValueAtTime(value, time)
+      filter.frequency.setValueAtTime(value, time);
     },
     filterQ: (value, time) => filter.Q.setValueAtTime(value, time),
-    aEnvAttack: value => {aAttack = value},
-    aEnvDecay: value => {aDecay = value},
-    aEnvRelease: value => {aRelease = value},
-    fEnvRelease: value => {fEnvRelease = value},
-    eqFrequency: value => { eq.frequency.value = value; },
-    eqGain: value => { eq.gain.value = value; },
-    eqType: value => { eq.type = value; },
-    eqQ: value => { eq.Q.value = value; },
+    aEnvAttack: value => {
+      aAttack = value;
+    },
+    aEnvDecay: value => {
+      aDecay = value;
+    },
+    aEnvRelease: value => {
+      aRelease = value;
+    },
+    fEnvRelease: value => {
+      fEnvRelease = value;
+    },
+    eqFrequency: value => {
+      eq.frequency.value = value;
+    },
+    eqGain: value => {
+      eq.gain.value = value;
+    },
+    eqType: value => {
+      eq.type = value;
+    },
+    eqQ: value => {
+      eq.Q.value = value;
+    }
   };
 
   const setParam = (param, value, atTime) => {
@@ -86,12 +116,14 @@ const create = ctx => {
     let match;
     if (paramHandlers[param]) {
       paramHandlers[param](value, time);
-    } else if (match = param.match(/detune(\d)/)) {
+    } else if ((match = param.match(/detune(\d)/))) {
       vcos[match[1]].setDetune(value);
-    } else if (match = param.match(/oscType(\d)/)) {
+    } else if ((match = param.match(/oscType(\d)/))) {
       vcos[match[1]].setOscType(value);
-    } else if (match = param.match(/oscOn(\d)/)) {
-      vcos[match[1]][value ? 'start' : 'stop']();
+    } else if ((match = param.match(/lfoAmount(\d)/))) {
+      vcos[match[1]].setLfoAmount(value);
+    } else if ((match = param.match(/oscOn(\d)/))) {
+      vcos[match[1]][value ? "start" : "stop"]();
     }
   };
 
@@ -103,8 +135,8 @@ const create = ctx => {
 
     noteOn,
     noteOff,
-    setParam,
+    setParam
   };
-}
+};
 
 export default create;

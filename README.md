@@ -6,14 +6,23 @@ Continuing the long tradition of music generators, this aesthetically pleasing a
 
 ## Changelog
 
+v0.4
+
+- vibrato in osc
+- 8th lead algorithm
+- improved pad
+
 v0.3
- - add orchestra hit
- - improve bd algorithms
- - panning
- - second lead
+
+- add orchestra hit
+- improve bd algorithms
+- panning
+- second lead
 
 v0.2
- - drums: add perc samples, breakbeat, hihat variation, random fills
+
+- drums: add perc samples, breakbeat, hihat variation, random fills
 
 v0.1
- - initial release
+
+- initial release
