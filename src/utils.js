@@ -14,13 +14,13 @@ export const randWeighted = (choices, weights) => {
 export const sample = arr =>
   arr.length > 0 ? arr[rand(0, arr.length - 1)] : undefined;
 
-const shuffleArray = arr =>
+export const shuffle = arr =>
   arr
     .map(a => [Math.random(), a])
     .sort((a, b) => a[0] - b[0])
     .map(a => a[1]);
 
 export const sampleN = n => arr => {
-  const shuffled = shuffleArray(arr);
+  const shuffled = shuffle(arr);
   return shuffled.slice(0, n);
 };

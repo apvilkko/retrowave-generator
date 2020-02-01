@@ -1,5 +1,12 @@
 import instruments, { all, CHILDREN } from "./instruments";
-import { sample, rand, randFloat, randWeighted, sampleN } from "../utils";
+import {
+  sample,
+  rand,
+  randFloat,
+  randWeighted,
+  sampleN,
+  shuffle
+} from "../utils";
 import retrosynth from "../retrosynth";
 import polysynth from "../retrosynth/polysynth";
 import setParams from "../audio-components/setParams";
@@ -134,6 +141,25 @@ const BASS_MOVEMENT_PRESETS = [
   [0, 0, 0, -1]
 ];
 
+const LEAD_8TH_PRESETS = [
+  [0, 2, 3, 7],
+  [0, 3, 5, 7],
+  [0, 3, 7, 8],
+  [-5, -2, 2, 3],
+  [0, 7, 8, 12]
+];
+
+const PAD_PRESETS = [
+  [0, 2, 7],
+  [0, 5, 7],
+  [0, 3, 7],
+  [2, 5, 10],
+  [0, 5, 10],
+  [2, 3, 10],
+  [0, 7, 12],
+  [-2, 2, 3]
+];
+
 const mod = (n, m) => ((n % m) + m) % m;
 
 const isLastOf = (small, large) => (currentNote, exact) => {
@@ -162,7 +188,11 @@ const randomizers = {
     let theme;
     if (style === "8th") {
       const addOctave = rand(0, 100) > 50 ? 0 : 1;
-      theme = sampleN(4)(AEOLIAN).map(x => x + addOctave * octave);
+      const randomTheme =
+        rand(0, 100) > 30
+          ? shuffle(sample(LEAD_8TH_PRESETS))
+          : sampleN(4)(AEOLIAN);
+      theme = randomTheme.map(x => x + addOctave * octave);
     }
     return {
       volume: muted[LEAD1] ? 0.01 : 0.5,
@@ -342,9 +372,11 @@ const generators = {
         } else if (style === "8th") {
           if (currentNote % eighth === 0) {
             const note =
-              isLastOf(eighth, 8 * eighth)(currentNote) && rand(0, 100) > 60
+              isLastOf(eighth, 8 * eighth)(currentNote, true) &&
+              rand(0, 100) > 60
                 ? sample(AEOLIAN)
-                : theme[pos++ % theme.length];
+                : theme[pos % theme.length];
+            pos++;
             return {
               note: ROOT_NOTE + octave + scene.rootNoteOffset + note,
               velocity: scene.instruments[LEAD1].volume
@@ -629,19 +661,19 @@ const generators = {
       () => null,
       ({ currentNote, scene }) => {
         if (currentNote % bar === 0) {
-          current = sample([[0, 2, 7], [0, 5, 7], [0, 3, 7], [2, 5, 10]]);
+          current = sample(PAD_PRESETS);
           return current.map(x => ({
             note: ROOT_NOTE + 2 * octave + scene.rootNoteOffset + x,
             velocity: scene.instruments[PAD].volume * randFloat(0.8, 1.0)
           }));
         } else if (currentNote % bar === bar / 2) {
-          return current.map(x => ({
-            note: ROOT_NOTE + 2 * octave + scene.rootNoteOffset + x,
+          return current.map(() => ({
             action: "OFF"
           }));
         }
         return null;
-      }
+      },
+      true
     )(style, scene);
   },
   [ORCH]: createPatternGenerator(
@@ -740,6 +772,11 @@ const createInstrumentInstance = (context, instrument, specs) => {
     }
     case PAD: {
       const synth = polysynth(context.mixer.ctx);
+      const fEnvRelease = randFloat(0.1, 1.0);
+      const fEnvAttack = randFloat(0.1, 0.6);
+      const aEnvAttack = randFloat(0.2, 0.5);
+      const aEnvRelease = randFloat(0.5, 1.0);
+      const aEnvDecay = randFloat(0.1, 0.2);
       setParams(synth)({
         oscType0: specs.oscType,
         oscType1: specs.oscType,
@@ -749,11 +786,11 @@ const createInstrumentInstance = (context, instrument, specs) => {
         oscOn1: true,
         filterFreq: rand(600, 3500),
         filterQ: randFloat(0.5, 5),
-        fEnvAttack: randFloat(0.1, 1.0),
-        fEnvRelease: randFloat(0.1, 3.0),
-        aEnvAttack: randFloat(0.2, 0.5),
-        aEnvRelease: randFloat(0.5, 2.0),
-        aEnvDecay: randFloat(0.1, 0.2),
+        fEnvAttack,
+        fEnvRelease,
+        aEnvAttack,
+        aEnvRelease,
+        aEnvDecay,
         eqFrequency: 300,
         eqType: "lowshelf",
         eqGain: -6
@@ -811,6 +848,29 @@ const createInstrumentInstance = (context, instrument, specs) => {
   }
 };
 
+const cleanupInstance = instance => {
+  if (instance.cleanup) {
+    instance.cleanup();
+  }
+  if (instance.vcos) {
+    instance.vcos.forEach(vco => {
+      vco.stop();
+    });
+  }
+  if (instance.output) {
+    instance.output.disconnect();
+  }
+  if (instance.children) {
+    Object.values(instance.children).forEach(child => {
+      child.panner.disconnect();
+      child.output.disconnect();
+    });
+  }
+  if (instance.instances) {
+    instance.instances.forEach(cleanupInstance);
+  }
+};
+
 const cleanup = context => {
   const scene = context.scene;
   if (!scene) {
@@ -831,17 +891,10 @@ const cleanup = context => {
       sends[i].output.disconnect();
       delete sends[i];
     }
-    if (instance.output) {
-      instance.output.disconnect();
-    }
-    if (instance.children) {
-      Object.values(instance.children).forEach(child => {
-        child.panner.disconnect();
-        child.output.disconnect();
-      });
-    }
+    cleanupInstance(instance);
     track.panner.disconnect(context.mixer.input);
     track.gain.disconnect(track.panner);
+    delete scene.instances[instrument];
   });
 };
 

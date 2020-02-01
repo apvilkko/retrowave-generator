@@ -111,6 +111,17 @@ const create = ctx => {
     }
   };
 
+  const stop = () => {
+    vcos.forEach(vco => vco.stop());
+  };
+
+  const cleanup = () => {
+    vcas.forEach(vca => {
+      vca.disconnect(filter);
+    });
+    eq.disconnect(output);
+  };
+
   const setParam = (param, value, atTime) => {
     const time = atTime || ctx.currentTime;
     let match;
@@ -135,7 +146,9 @@ const create = ctx => {
 
     noteOn,
     noteOff,
-    setParam
+    setParam,
+    stop,
+    cleanup
   };
 };
 

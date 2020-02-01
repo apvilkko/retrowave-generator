@@ -6,6 +6,11 @@ Continuing the long tradition of music generators, this aesthetically pleasing a
 
 ## Changelog
 
+v0.5
+
+- algorithm improvements
+- cleanup improvements on randomize
+
 v0.4
 
 - vibrato in osc

@@ -1,5 +1,5 @@
 import createMixer from "./core/mixer";
-import createSequencer, { play } from "./core/sequencer";
+import createSequencer, { play, pause, reset } from "./core/sequencer";
 import loop from "./core/loop";
 import { randomize } from "./generator/scene";
 import createAnalyserCanvas from "./visualization/createAnalyserCanvas";
@@ -30,6 +30,12 @@ const setupAnalyser = root => {
 const createActions = context => ({
   play: () => {
     play(context.sequencer);
+  },
+  pause: () => {
+    pause(context.sequencer);
+  },
+  reset: () => {
+    reset(context.sequencer);
   },
   randomize: () => {
     randomizeScene();
